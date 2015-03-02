@@ -74,7 +74,7 @@
   \addtogroup commonapi
   \{
 */
-
+#include <assert.h>
 #include <stdio.h>
 #include <linux/limits.h>
 

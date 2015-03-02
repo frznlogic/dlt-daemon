@@ -56,6 +56,8 @@
 
 #include <stdbool.h>
 
+#include <sys/un.h>
+#include <sys/socket.h>
 
 #include "dlt_user.h"
 #include "dlt_common.h"
@@ -173,6 +175,30 @@ DltReturnValue dlt_user_check_library_version(const char *user_major_version,con
     return DLT_RETURN_OK;
 }
 
+DltReturnValue dlt_initialize_socket_connection()
+{
+    dlt_user.socket_handle = socket(AF_UNIX, SOCK_STREAM, 0);
+
+    if ( dlt_user.socket_handle == -1 ) {
+        dlt_log(LOG_CRIT, "Failed to create socket\n");
+        return DLT_RETURN_ERROR;
+    }
+
+    struct sockaddr_un remote;
+
+    remote.sun_family = AF_UNIX;
+    strcpy(remote.sun_path, DLT_USER_SOCKET_PATH);
+
+    if (connect( dlt_user.socket_handle, (struct sockaddr*) &remote, strlen(remote.sun_path) +
+               sizeof(remote.sun_family) )
+        == -1) {
+        dlt_log(LOG_CRIT, "Failed to connect to the daemon via socket " DLT_USER_SOCKET_PATH "\n");
+           return DLT_RETURN_ERROR;
+    }
+
+    return DLT_RETURN_OK;
+}
+
 DltReturnValue dlt_init(void)
 {
     char filename[DLT_USER_MAX_FILENAME_LENGTH];
@@ -209,70 +235,12 @@ DltReturnValue dlt_init(void)
     memset(&(dlt_user.dlt_shm),0,sizeof(DltShm));
 #endif
 
-    /* create dlt pipes directory */
-    /* Make sure the parent user directory is created */
-    if (dlt_mkdir_recursive(dltFifoBaseDir) != 0)
-    {
-      dlt_vnlog(LOG_ERR,DLT_USER_BUFFER_LENGTH, "Base dir %s cannot be created!\n", dltFifoBaseDir);
-      return DLT_RETURN_ERROR;
-    }
-
-    ret=mkdir(dlt_user_dir, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH  | S_IWOTH | S_ISVTX );
-    if (ret==-1 && errno != EEXIST)
-    {
-        dlt_vnlog(LOG_ERR, DLT_USER_BUFFER_LENGTH, "FIFO user dir %s cannot be created!\n", dlt_user_dir);
-        return DLT_RETURN_ERROR;
-    }
-
-    /* if dlt pipes directory is created by the application also chmod the directory */
-    if(ret == 0)
-    {
-        // S_ISGID cannot be set by mkdir, let's reassign right bits
-        ret=chmod(dlt_user_dir, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP | S_IROTH  | S_IWOTH | S_IXOTH | S_ISGID | S_ISVTX );
-        if (ret==-1)
-        {
-            dlt_vnlog(LOG_ERR, DLT_USER_BUFFER_LENGTH, "FIFO user dir %s cannot be chmoded!\n", dlt_user_dir);
-            return DLT_RETURN_ERROR;
-        }
-    }
-
-    /* create and open DLT user FIFO */
-    snprintf(filename,DLT_USER_MAX_FILENAME_LENGTH,"%s/dlt%d",dlt_user_dir,getpid());
-     
-    /* Try to delete existing pipe, ignore result of unlink */
-    unlink(filename);
-
-    ret=mkfifo(filename, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP );
-    if (ret==-1)
-    {
-        dlt_vnlog(LOG_WARNING, DLT_USER_BUFFER_LENGTH, "Loging disabled, FIFO user %s cannot be created!\n", filename);
-        /* return DLT_RETURN_OK; */ /* removed to prevent error, when FIFO already exists */
-    }
-
-    // S_IWGRP cannot be set by mkfifo (???), let's reassign right bits
-    ret=chmod(filename, S_IRUSR | S_IWUSR | S_IWGRP | S_IRGRP );
-    if (ret==-1)
-    {
-        dlt_vnlog(LOG_WARNING, DLT_USER_BUFFER_LENGTH, "FIFO user %s cannot be chmoded!\n", dlt_user_dir);
-        return DLT_RETURN_ERROR;
-    }
-
-    dlt_user.dlt_user_handle = open(filename, O_RDWR | O_CLOEXEC);
-    if (dlt_user.dlt_user_handle == DLT_FD_INIT)
-    {
-        dlt_vnlog(LOG_WARNING, DLT_USER_BUFFER_LENGTH, "Logging disabled, FIFO user %s cannot be opened!\n", filename);
-        unlink(filename);
-        return DLT_RETURN_OK;
-    }
-
     /* open DLT output FIFO */
     dlt_user.dlt_log_handle = open(dlt_daemon_fifo, O_WRONLY | O_NONBLOCK | O_CLOEXEC );
     if (dlt_user.dlt_log_handle==-1)
     {
-        /* This is a normal usecase. It is OK that the daemon (and thus the FIFO /tmp/dlt)
-           starts later and some DLT users have already been started before.
-           Thus it is OK if the FIFO can't be opened. */
-        dlt_vnlog(LOG_INFO, DLT_USER_BUFFER_LENGTH, "FIFO %s cannot be opened. Retrying later...\n",dlt_daemon_fifo);
+        snprintf(str,DLT_USER_BUFFER_LENGTH,"Logging disabled, FIFO %s cannot be opened with open()!\n",DLT_USER_FIFO);
+        dlt_log(LOG_WARNING, str);
         //return DLT_RETURN_OK;
     }
     else
@@ -288,10 +256,14 @@ DltReturnValue dlt_init(void)
             //return DLT_RETURN_OK;
         }
 #endif
+
+        if(dlt_initialize_socket_connection() != DLT_RETURN_OK) {
+            // We could connect to the pipe, but not to the socket, which is normally open before by the DLT daemon => bad failure => return error code
+            return -1;
+        }
     }
 
-
-    if (dlt_receiver_init(&(dlt_user.receiver),dlt_user.dlt_user_handle, DLT_USER_RCVBUF_MAX_SIZE) == DLT_RETURN_ERROR)
+    if (dlt_receiver_init(&(dlt_user.receiver),dlt_user.socket_handle, DLT_USER_RCVBUF_MAX_SIZE) == DLT_RETURN_ERROR)
     {
         dlt_user_initialised = false;
         return DLT_RETURN_ERROR;
@@ -444,7 +416,7 @@ DltReturnValue dlt_init_common(void)
     dlt_user.log_state = -1;
 
     dlt_user.dlt_log_handle=-1;
-    dlt_user.dlt_user_handle=DLT_FD_INIT;
+    dlt_user.socket_handle=DLT_FD_INIT;
 
     dlt_set_id(dlt_user.ecuID,DLT_USER_DEFAULT_ECU_ID);
     dlt_set_id(dlt_user.appID,"");
@@ -614,7 +586,6 @@ int dlt_user_atexit_blow_out_user_buffer(void){
 DltReturnValue dlt_free(void)
 {
     uint32_t i;
-    char filename[DLT_USER_MAX_FILENAME_LENGTH];
 
     if( dlt_user_freeing != 0 )
         // resources are already being freed. Do nothing and return.
@@ -632,14 +603,10 @@ DltReturnValue dlt_free(void)
 
     dlt_stop_threads();
 
-    if (dlt_user.dlt_user_handle!=DLT_FD_INIT)
+    if (dlt_user.socket_handle!=DLT_FD_INIT)
     {
-        snprintf(filename,DLT_USER_MAX_FILENAME_LENGTH,"%s/dlt%d",dlt_user_dir,getpid());
-
-        close(dlt_user.dlt_user_handle);
-        dlt_user.dlt_user_handle=DLT_FD_INIT;
-
-        unlink(filename);
+        close(dlt_user.socket_handle);
+        dlt_user.socket_handle=DLT_FD_INIT;
     }
 
 #ifdef DLT_SHM_ENABLE
@@ -652,6 +619,7 @@ DltReturnValue dlt_free(void)
         /* close log file/output fifo to daemon */
         close(dlt_user.dlt_log_handle);
         dlt_user.dlt_log_handle = -1;
+        dlt_user.socket_handle = -1;
     }
 
     /* Ignore return value */
@@ -3626,7 +3594,6 @@ DltReturnValue dlt_user_log_send_register_application(void)
 
     /* set usercontext */
     dlt_set_id(usercontext.apid,dlt_user.appID);       /* application id */
-    usercontext.pid = getpid();
 
     if (dlt_user.application_description != NULL)
     {
@@ -3651,7 +3618,6 @@ DltReturnValue dlt_user_log_send_register_application(void)
     /* store message in ringbuffer, if an error has occured */
     if (ret < DLT_RETURN_OK)
     {
-        DLT_SEM_LOCK();
 
         if (dlt_buffer_push3(&(dlt_user.startup_buffer),
                             (unsigned char *)&(userheader), sizeof(DltUserHeader),
@@ -4007,7 +3973,7 @@ DltReturnValue dlt_user_log_check_user_message(void)
     delayed_injection_callback.service_id = 0;
     delayed_log_level_changed_callback.log_level_changed_callback = 0;
 
-    if (dlt_user.dlt_user_handle!=DLT_FD_INIT)
+    if (dlt_user.socket_handle!=DLT_FD_INIT)
     {
         while (1)
         {
@@ -4321,7 +4287,13 @@ void dlt_user_log_reattach_to_daemon(void)
         dlt_user.dlt_log_handle = open(dlt_daemon_fifo, O_WRONLY | O_NONBLOCK);
         if (dlt_user.dlt_log_handle > 0)
         {
-            if (dlt_user_log_init(&handle,&log_new) < DLT_RETURN_OK)
+            if(dlt_initialize_socket_connection() != DLT_RETURN_OK) {
+                // We could connect to the pipe, but not to the socket, which is normally open before by the DLT daemon => bad failure => return error code
+                close(dlt_user.dlt_log_handle);
+                dlt_user.dlt_log_handle = -1;
+                return;
+            }
+            if (dlt_user_log_init(&handle,&log_new)==-1)
             {
                 return;
             }

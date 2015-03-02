@@ -293,6 +293,49 @@ int dlt_daemon_client_send(int sock,DltDaemon *daemon,DltDaemonLocal *daemon_loc
                                                        data2,
                                                        size2,
                                                        verbose);
+			/**
+             * TODO-OAN: This code is from the patch, adapt to other changes?
+             */
+#if 0
+            int sent = 0;
+			/* look if TCP connection to client is available */
+			for (j = 0; j <= daemon_local->fdmax; j++)
+			{
+				/* send to everyone! */
+				if (FD_ISSET(j, &(daemon_local->master)))
+				{
+					if ((j != daemon_local->fp) && (j != daemon_local->local_socket) && (j != daemon_local->sock)
+		#ifdef DLT_SYSTEMD_WATCHDOG_ENABLE
+								&& (j!=daemon_local->timer_wd)
+		#endif
+					&& (j!=daemon_local->timer_one_s) && (j!=daemon_local->timer_sixty_s))
+					{
+						/* Send message */
+						if (isatty(j))
+						{
+							DLT_DAEMON_SEM_LOCK();
+
+							if((ret=dlt_daemon_serial_send(j,data1,size1,data2,size2,daemon->sendserialheader)))
+							{
+								DLT_DAEMON_SEM_FREE();
+								dlt_log(LOG_WARNING,"dlt_daemon_client_send: serial send dlt message failed\n");
+								return ret;
+							}
+
+							DLT_DAEMON_SEM_FREE();
+						}
+						else
+						{
+							DLT_DAEMON_SEM_LOCK();
+
+							if((ret=dlt_daemon_socket_send(j,data1,size1,data2,size2,daemon->sendserialheader)))
+							{
+								DLT_DAEMON_SEM_FREE();
+								dlt_log(LOG_WARNING,"dlt_daemon_client_send: socket send dlt message failed\n");
+								dlt_daemon_close_socket(j, daemon, daemon_local, verbose);
+								return ret;
+							}
+#endif
 
 			if((sock==DLT_DAEMON_SEND_FORCE) && !sent)
 			{

@@ -135,6 +135,13 @@ typedef struct
 typedef struct
 {
     DltDaemonFlags flags;     /**< flags of the daemon */
+    int fp;               /**< handle for own fifo */
+    int local_socket;               /**< handle for local socket */
+    int sock;             /**< handle for tcp connection to client */
+    int fdserial;         /**< handle for serial connection */
+    int fdmax;            /**< highest number of used handles */
+    fd_set master;            /**< master set of handles */
+    fd_set read_fds;          /**< read set of handles */
     DltFile file;             /**< struct for file access */
     DltEventHandler pEvent; /**< struct for message producer event handling */
     DltGateway pGateway; /**< struct for passive node connection handling */
@@ -196,11 +203,29 @@ typedef int (*dlt_daemon_process_user_message_func)(DltDaemon *daemon, DltDaemon
 
 int dlt_daemon_process_user_message_overflow(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose);
 int dlt_daemon_send_message_overflow(DltDaemon *daemon, DltDaemonLocal *daemon_local, int verbose);
-int dlt_daemon_process_user_message_register_application(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose);
-int dlt_daemon_process_user_message_unregister_application(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose);
-int dlt_daemon_process_user_message_register_context(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose);
-int dlt_daemon_process_user_message_unregister_context(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose);
-int dlt_daemon_process_user_message_log(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose);
+int dlt_daemon_process_user_message_register_application(DltDaemon *daemon,
+                                                         DltDaemonLocal *daemon_local,
+                                                         DltReceiver *rec,
+                                                         int fd,
+                                                         void* buf,
+                                                         pid_t pid,
+                                                         int verbose);
+int dlt_daemon_process_user_message_unregister_application(DltDaemon *daemon,
+                                                           DltDaemonLocal *daemon_local,
+                                                           DltReceiver *rec,
+                                                           int verbose);
+int dlt_daemon_process_user_message_register_context(DltDaemon *daemon,
+                                                     DltDaemonLocal *daemon_local,
+                                                     DltReceiver *rec,
+                                                     int verbose);
+int dlt_daemon_process_user_message_unregister_context(DltDaemon *daemon,
+                                                       DltDaemonLocal *daemon_local,
+                                                       DltReceiver *rec,
+                                                       int verbose);
+int dlt_daemon_process_user_message_log(DltDaemon *daemon,
+                                        DltDaemonLocal *daemon_local,
+                                        DltReceiver *rec,
+                                        int verbose);
 #ifdef DLT_SHM_ENABLE
 int dlt_daemon_process_user_message_log_shm(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose);
 #endif
