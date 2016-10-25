@@ -75,6 +75,8 @@
 
 #include <sys/types.h>
 
+#define DLT_USER_SOCKET_PATH "/tmp/dltsocket"
+
 /**
  * This is the header of each message to be exchanged between application and daemon.
  */

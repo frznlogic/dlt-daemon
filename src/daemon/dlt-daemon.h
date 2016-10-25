@@ -139,6 +139,7 @@ typedef struct
     DltEventHandler pEvent; /**< struct for message producer event handling */
     DltGateway pGateway; /**< struct for passive node connection handling */
     DltMessage msg;           /**< one dlt message */
+    int local_socket;       /**< Handle for local socket */
     int client_connections;    /**< counter for nr. of client connections */
     size_t baudrate;          /**< Baudrate of serial connection */
 #ifdef DLT_SHM_ENABLE

@@ -516,7 +516,7 @@ typedef struct
     uint32_t service_id;            /**< service ID */
     uint8_t  status;                /**< reponse status */
     uint32_t length;                /**< length of following payload */
-    /*char [] payload;*/
+    /*char [] payload;*/
 } PACKED DltServiceGetSoftwareVersionResponse;
 
 /**

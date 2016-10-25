@@ -130,6 +130,14 @@ int dlt_daemon_handle_event(DltEventHandler *pEvent,
             fd = con->receiver->fd;
         }
 
+        if (i == daemon_local->local_socket) {
+            dlt_daemon_process_client_connect(daemon,
+                                              daemon_local,
+                                              con->receiver,
+                                              daemon_local->flags.vflag);
+            continue;
+        }
+
         /* First of all handle epoll error events
          * We only expect EPOLLIN or EPOLLOUT
          */
