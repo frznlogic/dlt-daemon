@@ -117,6 +117,8 @@ int dlt_daemon_handle_event(DltEventHandler *pEvent,
         return 0;
     }
 
+    printf("nfds: %i\n", nfds);
+
     for (i = 0 ; i < nfds ; i++)
     {
         struct epoll_event *ev = &pEvent->events[i];
@@ -130,7 +132,8 @@ int dlt_daemon_handle_event(DltEventHandler *pEvent,
             fd = con->receiver->fd;
         }
 
-        if (i == daemon_local->local_socket) {
+        if (pEvent->events[i].data.fd == daemon_local->local_socket) {
+            dlt_log(LOG_WARNING, "Accepted connection\n");
             dlt_daemon_process_client_connect(daemon,
                                               daemon_local,
                                               con->receiver,

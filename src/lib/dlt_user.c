@@ -40,6 +40,9 @@
 #include <sys/time.h>
 #include <math.h>
 
+#include <sys/un.h>
+#include <sys/socket.h>
+
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -173,11 +176,34 @@ DltReturnValue dlt_user_check_library_version(const char *user_major_version,con
     return DLT_RETURN_OK;
 }
 
+
+DltReturnValue dlt_initialize_socket_connection()
+{
+    dlt_user.socket_handle = socket(AF_UNIX, SOCK_STREAM, 0);
+
+    if ( dlt_user.socket_handle == -1 ) {
+        dlt_log(LOG_CRIT, "Failed to create socket\n");
+        return DLT_RETURN_ERROR;
+    }
+
+    struct sockaddr_un remote;
+
+    remote.sun_family = AF_UNIX;
+    strcpy(remote.sun_path, DLT_USER_SOCKET_PATH);
+
+    if (connect( dlt_user.socket_handle, (struct sockaddr*) &remote, strlen(remote.sun_path) +
+               sizeof(remote.sun_family) )
+        == -1) {
+        dlt_log(LOG_CRIT, "Failed to connect to the daemon via socket " DLT_USER_SOCKET_PATH "\n");
+           return DLT_RETURN_ERROR;
+    }
+
+    return DLT_RETURN_OK;
+}
+
+
 DltReturnValue dlt_init(void)
 {
-    char filename[DLT_USER_MAX_FILENAME_LENGTH];
-    int ret;
-
     // process is exiting. Do not allocate new resources.
     if (dlt_user_freeing != 0)
     {
@@ -209,6 +235,7 @@ DltReturnValue dlt_init(void)
     memset(&(dlt_user.dlt_shm),0,sizeof(DltShm));
 #endif
 
+#if 0
     /* create dlt pipes directory */
     /* Make sure the parent user directory is created */
     if (dlt_mkdir_recursive(dltFifoBaseDir) != 0)
@@ -264,6 +291,7 @@ DltReturnValue dlt_init(void)
         unlink(filename);
         return DLT_RETURN_OK;
     }
+#endif
 
     /* open DLT output FIFO */
     dlt_user.dlt_log_handle = open(dlt_daemon_fifo, O_WRONLY | O_NONBLOCK | O_CLOEXEC );
@@ -291,7 +319,13 @@ DltReturnValue dlt_init(void)
     }
 
 
-    if (dlt_receiver_init(&(dlt_user.receiver),dlt_user.dlt_user_handle, DLT_USER_RCVBUF_MAX_SIZE) == DLT_RETURN_ERROR)
+    if(dlt_initialize_socket_connection() != DLT_RETURN_OK) {
+        // We could connect to the pipe, but not to the socket, which is normally open before by the DLT daemon => bad failure => return error code
+        dlt_user_initialised = false;
+        return DLT_RETURN_ERROR;
+    }
+
+    if (dlt_receiver_init(&(dlt_user.receiver),dlt_user.socket_handle, DLT_USER_RCVBUF_MAX_SIZE) == DLT_RETURN_ERROR)
     {
         dlt_user_initialised = false;
         return DLT_RETURN_ERROR;
@@ -444,7 +478,7 @@ DltReturnValue dlt_init_common(void)
     dlt_user.log_state = -1;
 
     dlt_user.dlt_log_handle=-1;
-    dlt_user.dlt_user_handle=DLT_FD_INIT;
+    dlt_user.socket_handle=DLT_FD_INIT;
 
     dlt_set_id(dlt_user.ecuID,DLT_USER_DEFAULT_ECU_ID);
     dlt_set_id(dlt_user.appID,"");
@@ -632,12 +666,12 @@ DltReturnValue dlt_free(void)
 
     dlt_stop_threads();
 
-    if (dlt_user.dlt_user_handle!=DLT_FD_INIT)
+    if (dlt_user.socket_handle!=DLT_FD_INIT)
     {
         snprintf(filename,DLT_USER_MAX_FILENAME_LENGTH,"%s/dlt%d",dlt_user_dir,getpid());
 
-        close(dlt_user.dlt_user_handle);
-        dlt_user.dlt_user_handle=DLT_FD_INIT;
+        close(dlt_user.socket_handle);
+        dlt_user.socket_handle=DLT_FD_INIT;
 
         unlink(filename);
     }
@@ -4007,7 +4041,7 @@ DltReturnValue dlt_user_log_check_user_message(void)
     delayed_injection_callback.service_id = 0;
     delayed_log_level_changed_callback.log_level_changed_callback = 0;
 
-    if (dlt_user.dlt_user_handle!=DLT_FD_INIT)
+    if (dlt_user.socket_handle!=DLT_FD_INIT)
     {
         while (1)
         {

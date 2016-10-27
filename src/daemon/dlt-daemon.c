@@ -1021,8 +1021,8 @@ static int dlt_daemon_init_uds(DltDaemonLocal *daemon_local)
     return dlt_connection_create(daemon_local,
                                  &daemon_local->pEvent,
                                  daemon_local->local_socket,
-                                 EPOLLIN,
-                                 DLT_CONNECTION_APP_MSG);
+                                 EPOLLIN|EPOLLET,
+                                 DLT_CONNECTION_CLIENT_CONNECT);
 }
 
 //########################################
