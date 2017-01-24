@@ -199,6 +199,8 @@ int option_handling(DltDaemonLocal *daemon_local,int argc, char* argv[])
     snprintf(daemon_local->flags.userPipesDir, NAME_MAX + 1, "%s/dltpipes", dltFifoBaseDir);
     snprintf(daemon_local->flags.daemonFifoName, NAME_MAX + 1, "%s/dlt", dltFifoBaseDir);
 
+    snprintf(daemon_local->flags.daemonSocketName, NAME_MAX + 1, "%s/dltsocket", dltFifoBaseDir);
+
     return 0;
 
  } /* option_handling() */
@@ -990,27 +992,28 @@ static int dlt_daemon_init_uds(DltDaemonLocal *daemon_local)
         return -1;
     }
 
-    struct sockaddr_un local = {.sun_family = AF_UNIX};
+    struct sockaddr_un local;
+    local.sun_family = AF_UNIX;
 
-    strcpy(local.sun_path, DLT_USER_SOCKET_PATH);
-    unlink(local.sun_path);
+    strcpy(local.sun_path, daemon_local->flags.daemonSocketName);
+    //unlink(local.sun_path);
 
     if (bind(daemon_local->local_socket,
               (struct sockaddr*) &local,
               strlen(local.sun_path) + sizeof(local.sun_family))
             != 0) {
-        fprintf(stderr,"Failed to bind server socket %s", DLT_USER_SOCKET_PATH);
+        fprintf(stderr,"Failed to bind server socket %s", daemon_local->flags.daemonSocketName);
         return -1;
     }
 
     if (listen(daemon_local->local_socket, SOMAXCONN) != 0) {
-        fprintf(stderr,"Failed to listen to socket %s", DLT_USER_SOCKET_PATH);
+        fprintf(stderr,"Failed to listen to socket %s", daemon_local->flags.daemonSocketName);
     }
 
     // Allow the applications which run as a different user to connect
-    if (chmod(DLT_USER_SOCKET_PATH, S_IRWXU | S_IRWXG) != 0)
+    if (chmod(daemon_local->flags.daemonSocketName, S_IRWXU | S_IRWXG) != 0)
     {
-        fprintf(stderr,"Failed to chmod socket : %s", DLT_USER_SOCKET_PATH);
+        fprintf(stderr,"Failed to chmod socket : %s", daemon_local->flags.daemonSocketName);
     }
 
 
@@ -1022,7 +1025,7 @@ static int dlt_daemon_init_uds(DltDaemonLocal *daemon_local)
                                  &daemon_local->pEvent,
                                  daemon_local->local_socket,
                                  EPOLLIN|EPOLLET,
-                                 DLT_CONNECTION_CLIENT_CONNECT);
+                                 DLT_CONNECTION_APP_MSG);
 }
 
 //########################################
@@ -1043,6 +1046,7 @@ pid_t getPidFromFiledescriptor(int fd) {
 
 int dlt_daemon_process_client_connection(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose)
 {
+    printf("ewfwejiorfre\n");
     // We got a new client connection
 
     struct sockaddr remote = { };
@@ -1629,6 +1633,8 @@ int dlt_daemon_process_client_messages(DltDaemon *daemon,
         return -1;
     }
 
+    printf("regfwerkopgfrwe\n");
+
     /* Process all received messages */
     while (dlt_message_read(&(daemon_local->msg),
                             (uint8_t*)receiver->buf,
@@ -1960,6 +1966,7 @@ int dlt_daemon_process_user_messages(DltDaemon *daemon,
                                      DltReceiver *receiver,
                                      int verbose)
 {
+    printf("egrjioetrg\n");
     int offset = 0;
     int run_loop = 1;
     int32_t min_size = (int32_t)sizeof(DltUserHeader);
@@ -1982,6 +1989,7 @@ int dlt_daemon_process_user_messages(DltDaemon *daemon,
                 "dlt_receiver_receive_fd() for user messages failed!\n");
         return -1;
     }
+    printf("bytes received: %i\n", receiver->bytesRcvd);
 
     /* look through buffer as long as data is in there */
     while ((receiver->bytesRcvd >= min_size) && run_loop)
@@ -2112,6 +2120,7 @@ int dlt_daemon_process_user_message_register_application(DltDaemon *daemon,
                                                          DltReceiver *rec,
                                                          int verbose)
 {
+    printf("erfkoefpr\n");
     uint32_t len = sizeof(DltUserControlMsgRegisterApplication);
     DltDaemonApplication *application = NULL;
     char local_str[DLT_DAEMON_TEXTBUFSIZE] = { '\0' };

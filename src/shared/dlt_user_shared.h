@@ -228,4 +228,6 @@ DltReturnValue dlt_user_log_out2(int handle, void *ptr1, size_t len1, void* ptr2
  */
 DltReturnValue dlt_user_log_out3(int handle, void *ptr1, size_t len1, void* ptr2, size_t len2, void *ptr3, size_t len3);
 
+DltReturnValue dlt_user_log_out3_with_size_header(int handle, void *ptr1, size_t len1, void* ptr2, size_t len2, void *ptr3, size_t len3);
+
 #endif /* DLT_USER_SHARED_H */

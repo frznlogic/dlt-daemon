@@ -1146,6 +1146,7 @@ int dlt_message_read(DltMessage *msg, uint8_t *buffer, unsigned int length, int 
     /* check that standard header fits buffer */
     if (length<sizeof(DltStandardHeader))
     {
+        printf("length smaller than std header\n");
         /* dlt_log(LOG_ERR, "Length smaller than standard header!\n"); */
         return DLT_MESSAGE_ERROR_SIZE;
     }
@@ -1159,6 +1160,7 @@ int dlt_message_read(DltMessage *msg, uint8_t *buffer, unsigned int length, int 
     extra_size = DLT_STANDARD_HEADER_EXTRA_SIZE(msg->standardheader->htyp)+(DLT_IS_HTYP_UEH(msg->standardheader->htyp) ? sizeof(DltExtendedHeader) : 0);
     msg->headersize = sizeof(DltStorageHeader) + sizeof(DltStandardHeader) + extra_size;
     msg->datasize =  DLT_BETOH_16(msg->standardheader->len) - (msg->headersize - sizeof(DltStorageHeader));
+    printf("length %i stdheader->len %i headersize %i dltstorageheader %lu\n", length, msg->standardheader->len, msg->headersize, sizeof(DltStorageHeader));
 
     if (verbose)
     {

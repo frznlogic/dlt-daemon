@@ -72,6 +72,8 @@ int dlt_daemon_prepare_event_handling(DltEventHandler *ev)
     return 0;
 }
 
+int dlt_daemon_process_client_connection(DltDaemon *daemon, DltDaemonLocal *daemon_local, DltReceiver *rec, int verbose);
+
 /** @brief Catch and process incoming events.
  *
  * This function waits for events on all connections. Once an event raise,
@@ -117,8 +119,6 @@ int dlt_daemon_handle_event(DltEventHandler *pEvent,
         return 0;
     }
 
-    printf("nfds: %i\n", nfds);
-
     for (i = 0 ; i < nfds ; i++)
     {
         struct epoll_event *ev = &pEvent->events[i];
@@ -132,9 +132,12 @@ int dlt_daemon_handle_event(DltEventHandler *pEvent,
             fd = con->receiver->fd;
         }
 
-        if (pEvent->events[i].data.fd == daemon_local->local_socket) {
+        printf("fd: %i local_socket %i\n", fd, daemon_local->local_socket);
+        if (fd == daemon_local->local_socket) {
+            printf("weferkiop\n");
+
             dlt_log(LOG_WARNING, "Accepted connection\n");
-            dlt_daemon_process_client_connect(daemon,
+            dlt_daemon_process_client_connection(daemon,
                                               daemon_local,
                                               con->receiver,
                                               daemon_local->flags.vflag);

@@ -293,7 +293,7 @@ DltReturnValue dlt_init(void)
     }
 #endif
 
-    /* open DLT output FIFO */
+#if 0    /* open DLT output FIFO */
     dlt_user.dlt_log_handle = open(dlt_daemon_fifo, O_WRONLY | O_NONBLOCK | O_CLOEXEC );
     if (dlt_user.dlt_log_handle==-1)
     {
@@ -317,8 +317,9 @@ DltReturnValue dlt_init(void)
         }
 #endif
     }
+#endif
 
-
+    dlt_vnlog(LOG_INFO, DLT_USER_BUFFER_LENGTH, "erfiojerfioerjgfer\n");
     if(dlt_initialize_socket_connection() != DLT_RETURN_OK) {
         // We could connect to the pipe, but not to the socket, which is normally open before by the DLT daemon => bad failure => return error code
         dlt_user_initialised = false;
@@ -3676,8 +3677,15 @@ DltReturnValue dlt_user_log_send_register_application(void)
         return DLT_RETURN_OK;
     }
 
-    /* log to FIFO */
-    ret = dlt_user_log_out3(dlt_user.dlt_log_handle,
+    /* log to socket */
+//    ret = dlt_user_log_out3_with_size_header(dlt_user.socket_handle,
+//                                             &(userheader),
+//                                             sizeof(DltUserHeader),
+//                                             &(usercontext),
+//                                             sizeof(DltUserControlMsgRegisterApplication),
+//                                             dlt_user.application_description,
+//                                             usercontext.description_length);
+    ret = dlt_user_log_out3_with_size_header(dlt_user.socket_handle,
                     &(userheader), sizeof(DltUserHeader),
                     &(usercontext), sizeof(DltUserControlMsgRegisterApplication),
                     dlt_user.application_description, usercontext.description_length);

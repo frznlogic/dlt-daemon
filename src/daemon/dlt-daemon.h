@@ -121,6 +121,7 @@ typedef struct
     unsigned int offlineLogstorageCacheSize; /**< Max cache size offline logstorage cache */
     char userPipesDir[NAME_MAX + 1]; /**< (String: Directory) directory where dltpipes reside (Default: /tmp/dltpipes) */
     char daemonFifoName[NAME_MAX + 1]; /**< (String: Filename) name of local fifo (Default: /tmp/dlt) */
+    char daemonSocketName[NAME_MAX + 1]; /**< (String: Filename) name of the socket (Default: /tmp/dltsocket) */
     unsigned int  port; /**< port number */
     char ctrlSockPath[DLT_DAEMON_FLAG_MAX]; /**< Path to Control socket */
     int gatewayMode; /**< (Boolean) Gateway Mode */
